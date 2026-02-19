@@ -5,8 +5,8 @@ from typing import Annotated
 from curl_cffi.requests import AsyncSession
 from database import create_db_and_tables, get_session
 from fastapi import APIRouter, Depends, FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware  # Add this import
-from routers import attendance
+from fastapi.middleware.cors import CORSMiddleware
+from routers import attendance, auth
 from sqlmodel import Session
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -46,10 +46,10 @@ app.add_middleware(
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(attendance.router)
+router.include_router(auth.router)
 app.include_router(router)
 
 
 @app.get("/")
 async def root():
     return {"message": "Hello, World!"}
-

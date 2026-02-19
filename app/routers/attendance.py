@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import cast
 
 from database import get_session
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,8 +12,8 @@ from models import (
     AttendanceResponseBase,
     Student,
 )
-from sqlalchemy import join
-from sqlmodel import Session, select
+from routers.auth import verify_token
+from sqlmodel import Session, col, select
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
@@ -22,9 +23,9 @@ async def search_students(q: str, db: Session = Depends(get_session)):
     stmt = (
         select(Student)
         .where(
-            Student.nim.contains(q)
-            | Student.nama.contains(q)
-            | Student.prodi.contains(q)
+            col(Student.nim).contains(q)
+            | col(Student.nama).contains(q)
+            | col(Student.prodi).contains(q)
         )
         .order_by(Student.nim)
     )
@@ -70,7 +71,7 @@ async def checkin(req: AttendanceRequest, db: Session = Depends(get_session)):
     db.refresh(new_attendance)
 
     return AttendanceCheckInResponse(
-        id=new_attendance.id,
+        id=cast(int, new_attendance.id),
         nim=mhs.nim,
         nama=mhs.nama,
         jenis_kelamin=mhs.jenis_kelamin,
@@ -103,7 +104,7 @@ async def checkout(req: AttendanceRequest, db: Session = Depends(get_session)):
     db.refresh(attendance)
 
     return AttendanceCheckOutResponse(
-        id=attendance.id,
+        id=cast(int, attendance.id),
         nim=mhs.nim,
         nama=mhs.nama,
         jenis_kelamin=mhs.jenis_kelamin,
@@ -115,21 +116,22 @@ async def checkout(req: AttendanceRequest, db: Session = Depends(get_session)):
 
 
 @router.get("/history", response_model=list[AttendanceHistory], status_code=200)
-async def get_history(db: Session = Depends(get_session)):
+async def get_history(
+    db: Session = Depends(get_session),
+    _: str = Depends(verify_token),
+):
     stmt = (
         select(Attendance, Student)
-        .join(Student, Attendance.nim == Student.nim)
-        .order_by(Attendance.check_in.desc())
+        .join(Student, col(Attendance.nim) == Student.nim)
+        .order_by(col(Attendance.check_in).desc())
     )
-
     results = db.exec(stmt).all()
-
     if not results:
         return []
 
     return [
         AttendanceHistory(
-            id=a.id,
+            id=cast(int, a.id),
             nim=s.nim,
             nama=s.nama,
             jenis_kelamin=s.jenis_kelamin,
@@ -141,4 +143,3 @@ async def get_history(db: Session = Depends(get_session)):
         )
         for a, s in results
     ]
-
